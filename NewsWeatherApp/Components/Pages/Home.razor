@@ -1,0 +1,248 @@
+﻿@page "/"
+@using Newtonsoft.Json
+@inherits ComponentBase
+@inject HttpClient HttpClient
+@rendermode RenderMode.InteractiveServer
+
+<div class="search-tab">
+    <div class="search-bar">
+        <input type="text" placeholder="Search news..." @bind="searchTerm" />
+        <button @onclick="() => SearchNews()">Search</button>
+    </div>
+    <div class="search-bar">
+        <input type="text" placeholder="Search weather for city" @bind="searchTermWeather" />
+        <button @onclick="() => SearchWeater()">Search</button>
+    </div>
+</div>
+
+
+<div class="results">
+    @if (newsArticles != null)
+    {
+        <h1 style="justify-self:center;"></h1>
+        <ul class="news-list">
+            @foreach (var article in filteredArticles)
+            {
+                <li>
+                    <div class="article-info">
+                        <h3>@article.Title</h3>
+                        <br />
+                        <p>@article.Description</p>
+                        <img src="@article.UrlToImage" alt="Article Image" />
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (weatherInfo != null)
+    {
+        <div class="weather-info">
+            <h2>Weather Information</h2>
+            <p>Temperature: @weatherInfo.Main.Temp kelvin</p>
+            <p>Humidity: @weatherInfo.Main.Humidity %</p>
+            <p>Wind Speed: @weatherInfo.Wind.Speed km/h</p>
+        </div>
+
+    }
+
+</div>
+
+@code {
+    private NewsResponse newsArticles;
+    private WeatherResponse weatherInfo;
+    private List<Article> filteredArticles;
+    private string searchTerm = "";
+    private string searchTermWeather = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNewsAsync();
+        await LoadWeatherAsync();
+    }
+
+    private async Task LoadNewsAsync()
+    {
+        string apiUrl = "https://newsapi.org/v2/top-headlines?language=nl&country=nl&apiKey=90033938671b4331bad5a2693e874cbe";
+        var response = await HttpClient.GetAsync(apiUrl);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            newsArticles = JsonConvert.DeserializeObject<NewsResponse>(json);
+            filteredArticles = newsArticles.Articles;
+        }
+    }
+
+    private async Task LoadWeatherAsync(string? city = null)
+    {
+        string apiKey = "9fe36f519bf14ac12f20cc5e0a2235c7";
+        if (String.IsNullOrEmpty(city))
+            city = "amsterdam";
+        string apiUrl = $"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={apiKey}";
+
+        var response = await HttpClient.GetAsync(apiUrl);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            weatherInfo = JsonConvert.DeserializeObject<WeatherResponse>(json);
+        }
+    }
+
+    public void SearchNews()
+    {
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredArticles = newsArticles.Articles.Where(a => a.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        else
+        {
+            filteredArticles = newsArticles.Articles;
+        }
+    }
+    public async void SearchWeater()
+    {
+        if (!string.IsNullOrWhiteSpace(searchTermWeather))
+        {
+            await LoadWeatherAsync(searchTermWeather);
+        }
+        else
+        {
+            await LoadWeatherAsync(null);
+        }
+    }
+
+    // Models
+    public class Source
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+    }
+
+    public class Article
+    {
+        public Source Source { get; set; }
+        public string Author { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public string Url { get; set; }
+        public string UrlToImage { get; set; }
+        public DateTime PublishedAt { get; set; }
+        public string Content { get; set; }
+    }
+
+    public class NewsResponse
+    {
+        public string Status { get; set; }
+        public int TotalResults { get; set; }
+        public List<Article> Articles { get; set; }
+    }
+
+    public class WeatherResponse
+    {
+        public Coord Coord { get; set; }
+        public WeatherDetail[] Weather { get; set; }
+        public string Base { get; set; }
+        public Main Main { get; set; }
+        public int Visibility { get; set; }
+        public Wind Wind { get; set; }
+        public Clouds Clouds { get; set; }
+        public long Dt { get; set; }
+        public Sys Sys { get; set; }
+        public int Timezone { get; set; }
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int Cod { get; set; }
+    }
+
+    public class Coord
+    {
+        public double Lon { get; set; }
+        public double Lat { get; set; }
+    }
+
+    public class WeatherDetail
+    {
+        public int Id { get; set; }
+        public string Main { get; set; }
+        public string Description { get; set; }
+        public string Icon { get; set; }
+    }
+
+    public class Main
+    {
+        public double Temp { get; set; }
+        public double FeelsLike { get; set; }
+        public double TempMin { get; set; }
+        public double TempMax { get; set; }
+        public int Pressure { get; set; }
+        public int Humidity { get; set; }
+    }
+
+    public class Wind
+    {
+        public double Speed { get; set; }
+        public int Deg { get; set; }
+        public double Gust { get; set; }
+    }
+
+    public class Clouds
+    {
+        public int All { get; set; }
+    }
+
+    public class Sys
+    {
+        public int Type { get; set; }
+        public int Id { get; set; }
+        public string Country { get; set; }
+        public long Sunrise { get; set; }
+        public long Sunset { get; set; }
+    }
+}
+
+<style>
+    .results {
+        display:flex;
+
+    }
+    .search-tab {
+        display:flex;
+    }
+    .search-bar {
+        margin-bottom: 20px;
+        width:50%;
+    }
+
+    .weather-info {
+        width:30%;
+        margin:50px;
+        background-color:antiquewhite;
+    }
+
+    .news-list {
+        list-style: none;
+        padding: 0;
+        width: 70%;
+        margin: 50px;
+        background-color: beige;
+    }
+
+        .news-list li {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 20px;
+        }
+
+    .article-info {
+        display: flex;
+        align-items: center;
+    }
+
+        .article-info img {
+            margin-left: auto;
+            width : 200px;
+            height: auto;
+        }
+</style>
